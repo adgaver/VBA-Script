@@ -1,0 +1,40 @@
+Option Explicit
+
+Const DB_NAME As String = "gestione_energetica_DLR"
+
+Dim JRO As New JRO.JetEngine
+
+Dim sSourceFile As String
+Dim sDestinationFile As String
+
+Sub Main
+	Dim sErr As String
+	Dim lErr As Long
+
+	sSourceFile = GetDataLoggerRecipePath &  DB_NAME & ".mdb"
+	sDestinationFile = GetDataLoggerRecipePath & DB_NAME & "2.mdb"
+
+	On Error Resume Next
+	Kill(sDestinationFile)
+	On Error GoTo 0
+	Debug.Print sSourceFile & " database before compacting = " & FileLen(sSourceFile) & "(byte)"
+
+	Err.Clear
+	On Error Resume Next
+	'Compatta database Programs.mdb
+	JRO.CompactDatabase "Provider=Microsoft.Jet.OLEDB.4.0;Data Source=" & sSourceFile,"Provider=Microsoft.Jet.OLEDB.4.0;Data Source=" & sDestinationFile & ";Jet OLEDB:Engine Type=5"
+	lErr = Err.Number
+	sErr = Err.Description
+	On Error GoTo 0
+
+	If lErr <> 0 Then
+		Debug.Print "Command failed! Error Num = : " & lErr & " - Error Description = " & sErr
+		Exit Sub
+	End If
+
+	Kill(sSourceFile)
+	Name sDestinationFile As sSourceFile
+
+	Debug.Print sSourceFile & " database after compacting = " & FileLen(sSourceFile) & "(byte)"
+
+End Sub
