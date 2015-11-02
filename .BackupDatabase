@@ -1,0 +1,90 @@
+Option Explicit
+Type DataSt
+	Giorno As Integer
+	Mese As Integer
+	Anno As Integer
+End Type
+
+Dim DateDis As Date
+Dim DataAtt As DataSt
+Dim DataDisk As DataSt
+Dim Directory As String
+Dim NFile As String
+
+
+
+Const FileDate = "Movicon_bk.ini"
+
+Sub Main
+	' per primo devo controllare la data attuale
+	' creare una variabile nel Db variabili col nome VarX tipo Word
+	' in caso contrario non funzionerebbe il sistema
+	'
+
+
+
+
+	On Error GoTo Err_Proc
+
+	If VarX = 0 Then
+
+		Open FileDate For Input As #1
+			Input #1, DataDisk.Anno
+			Input #1, DataDisk.Mese
+			Input #1, DataDisk.Giorno
+
+		Close #1
+		VarX=DataDisk.Anno
+	End If
+
+    DataAtt.Anno = Year(Date)
+    DataAtt.Mese  = Month(Date)
+    DataAtt.Giorno  = Day(Date)
+
+    If (DataAtt.mese > DataDisk.mese) Or ( DataAtt.Anno >DataDisk.Anno ) Then
+		Open FileDate For Output As #1
+			Print #1, DataAtt.Anno
+			Print #1, DataAtt.Mese
+			Print #1, DataAtt.Giorno
+		Close #1
+
+		'
+		Directory = DataAtt.Anno & "_" & DataAtt.Mese  & "_"& DataAtt.Giorno
+		'devi creare una directory chiamata backup
+		'per default
+		MkDir "backup"
+		MkDir CurDir () & "\Backup\" & Directory
+		CopyDB
+	End If
+        Debug.Print "Backup effettuato"
+Exit_Proc:
+Exit Sub
+
+
+Err_Proc:
+
+Resume Next
+
+End Sub
+Sub CopyDB
+	On Error GoTo Err_Proc
+	Dim DirOr As String
+	Dim DirDest As String
+	DirOr= CurDir & "\DLOGGERS\"
+	DirDest=CurDir & "\backup\"& Directory & "\"
+
+	NFile = Dir$(DirOr & "*.MDB")
+    While NFile <> ""
+        FileCopy(DirOr & NFile , DirDest & NFile)
+        NFile = Dir$()
+    Wend
+
+Exit_Proc:
+Exit Sub
+
+
+Err_Proc:
+
+Resume Next
+
+End Sub
