@@ -1,0 +1,182 @@
+Option Explicit
+
+'assegna le variabili alle colonne del database
+
+Const TAB_COL_TIME As String = "LocalCol"
+Const TAB_COL_FDP As String = "Fattore di potenza"
+Const TAB_COL_PA As String = "Potenza attiva"
+Const TAB_COL_TDL As String = "Tensione di linea"
+Const TAB_COL_EIT As String = "Energia_Attiva_Importata_Tot"
+
+'constanti percorso e nome file
+
+Const PATH_DB As String = "\Backup\"
+Const FILE_DB As String = "DB_Backup_"
+
+'variabili di connessione al DB e query
+
+Dim Conn As New ADODB.Connection
+Dim Rst As New ADODB.Recordset
+Dim sQuery As String
+Dim sSQLConnect As String
+
+Dim sFileName As String
+Dim lRecordCount As Long
+Dim NFile, NFile2 As String
+
+'Utilizzo un ARRAY adattabile nel caso al numero di tabelle
+
+Dim ArrayTab(5) As String
+
+'Variabili dove assegno i percorsi di estrapolazione e salvataggio dei file CSV
+
+Dim Directory As String
+Dim DataQuery As String
+Dim DirOr As String
+Dim DirDest As String
+Dim ServerDir As String
+Dim Error_Number As Integer
+Dim percorso As String
+Dim percorso2 As String
+
+
+
+Sub Main
+	If RunningOnCE Then Exit Sub
+
+	'assegno i nomi delle tabelle all array.. così da poterle gestire in un ciclo
+
+    ArrayTab(0) = "Cabina"
+    ArrayTab(1) = "Cella_Frigor_3"
+    ArrayTab(2) = "Cella_Frigor_Inoculi"
+    ArrayTab(3) = "Laboratorio"
+    ArrayTab(4) = "Magazzino"
+    ArrayTab(5) = "Uffici"
+
+
+    On Error GoTo Err_Proc
+
+
+
+
+    Directory = Year(Date) & "_" & Month(Date)-1
+    'setto la data al mese precedente per selezionare un mese di record dal database
+    DataQuery = Year(Date) & "-" & Month(Date)-1 & "-" & 1
+    Debug.Print DataQuery
+    ServerDir = GetVariableValue("VAR00001")
+
+     'CREAZIONE CARTELLA LOCALE
+        Error_Number = 1
+		MkDir CurDir & "\backup"
+		MkDir CurDir & "\backup\" & Directory
+		MkDir ServerDir & Directory
+
+
+    '"\\itsis1dc01\groups\PisPCN\Dati Energia\"
+    'stringa che punta al file mdb presenta nella cartella di backup interna al progetto
+    'sSQLConnect = "Provider=Microsoft.Jet.OLEDB.4.0;Data " & "Source=" & CurDir & PATH_DB & Directory & "\" & FILE_DB & Directory & "_" & Day(Date) & ".mdb"
+
+    sSQLConnect = "Provider=SQLNCLI10;Server=(local);" & "Database=analisi energetica;" & "Integrated Security=SSPI;" & "DataTypeCompatibility=80;"
+
+
+    Error_Number = 2
+    Conn.ConnectionString = sSQLConnect
+    Debug.Print sSQLConnect
+    Conn.Open
+
+
+
+Dim ii As Integer
+For ii = 0 To UBound(ArrayTab()) Step 1
+
+
+	'estrapolazione dei dati presenti nel DB tramite query
+
+	sQuery =    "SELECT * FROM [analisi energetica].[dbo].[" &  ArrayTab(ii) & "] WHERE [analisi energetica].[dbo].[" & ArrayTab(ii) & "].LocalCol > '" & DataQuery & "'"
+    Debug.Print sQuery
+	'ADO open methods
+	'metodi di accesso al database,permessi,tipi di scrittura.
+	Error_Number = 3
+	Rst.Open sQuery, Conn, , , ADODB.adCmdText
+
+	If Not Rst.EOF Then
+
+	'End If
+		'Create file name
+
+		 sFileName = ArrayTab(ii) & "_Excel" & ".csv"
+
+		'creazione del file csv col le relative colonne
+		'Create a new Unicode file
+        Error_Number = 4
+		Open sFileName For Output As #1
+		Print #1, vbUTF16BOM; ' first char is the UTF-16 Byte Order Mark
+		Print #1,"Time" & vbTab & TAB_COL_FDP & vbTab & TAB_COL_PA & vbTab & TAB_COL_TDL & vbTab & TAB_COL_EIT
+
+		'scrittura nel file csv
+
+		lRecordCount = 0
+        Error_Number = 5
+
+	 	     While Not (Rst.EOF)
+
+     	 		    'Write Unicode file data
+                    'stringa utilizzata per scrivere una riga del file csv o unicode
+         		  	Print #1,Format(Rst.Fields(TAB_COL_TIME).Value, "yyyy/mm/dd hh:nn:ss") & vbTab & CStr(Rst.Fields(TAB_COL_FDP).Value) & vbTab & CStr(Rst.Fields(TAB_COL_PA).Value) & vbTab & CStr(Rst.Fields(TAB_COL_TDL).Value) & vbTab & CStr(Rst.Fields(TAB_COL_EIT).Value)
+	  		        Rst.MoveNext 'passa alla riga successiva
+	  		        lRecordCount = lRecordCount + 1
+	  		 Wend
+
+	  	Rst.Close
+		Close #1
+		End If
+
+		Set Rst = Nothing
+
+
+   'COPIA DEI FILE NELLA CARTELLA DI BACKUP LOCALE
+   Error_Number = 6
+   DirOr= CurDir & "\"
+   DirDest= CurDir & "\backup\" & Directory & "\"
+   NFile = ArrayTab(ii) & "_Excel" & ".csv"
+   NFile2 = "Backup_Excel_" & Directory & "_" & ArrayTab(ii) & ".csv"
+
+   FileCopy(DirOr & NFile , DirDest & NFile2)
+
+   'COPIA DEI FILE NELLA CARTELLA DI BACKUP NEL SERVER
+
+   DirDest= ServerDir & Directory & "\"
+   FileCopy(DirOr & NFile , DirDest & NFile2)
+
+    Kill(NFile) 'elimina il file presente nela cartella madre
+
+Next
+  Error_Number = 7
+  Conn.Close
+  Set Conn = Nothing
+
+  Err_Proc:
+
+  Select Case Error_Number
+    Case 1
+        Debug.Print("Errore in fase di creazione della cartella di backup, o cartella gia esistente.")
+    Case 2
+        Debug.Print("Errore in fase di connessione al database.")
+    Case 3
+        Debug.Print("Errore durante l' esecuzione della query.")
+    Case 4
+        Debug.Print("Errore in fase di creazione del file CSV.")
+    Case 5
+        Debug.Print("Errore in fase di scrittura sul file CSV.")
+    Case 6
+        Debug.Print("Errore nel copiare il file sul server.")
+    Case 7
+        Debug.Print("Backup effettuato.")
+    Case Else
+        Debug.Print("Not between 1 and 10, inclusive")
+End Select
+
+
+  Resume Next
+
+End Sub
